@@ -1,8 +1,15 @@
-﻿using System.Security.Claims;
+﻿using System;
+using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
+
+using AspNet.Identity.MongoDB;
+
 using Microsoft.AspNet.Identity;
-using Microsoft.AspNet.Identity.EntityFramework;
+//using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNet.Identity.Owin;
+
+using MongoDB.Driver;
 
 namespace Pressford.Models
 {
@@ -18,16 +25,35 @@ namespace Pressford.Models
         }
     }
 
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public class ApplicationIdentityContext : IDisposable
     {
-        public ApplicationDbContext()
-            : base("DefaultConnection", throwIfV1Schema: false)
+        public static ApplicationIdentityContext Create()
         {
+            // todo add settings where appropriate to switch server & database in your own application
+            var client = new MongoClient("mongodb://localhost:27117");
+            var database = client.GetDatabase("pressford");
+            var users = database.GetCollection<ApplicationUser>("users");
+            var roles = database.GetCollection<IdentityRole>("roles");
+            return new ApplicationIdentityContext(users, roles);
         }
-        
-        public static ApplicationDbContext Create()
+
+        private ApplicationIdentityContext(IMongoCollection<ApplicationUser> users, IMongoCollection<IdentityRole> roles)
         {
-            return new ApplicationDbContext();
+            Users = users;
+            Roles = roles;
+        }
+
+        public IMongoCollection<IdentityRole> Roles { get; set; }
+
+        public IMongoCollection<ApplicationUser> Users { get; set; }
+
+        public Task<List<IdentityRole>> AllRolesAsync()
+        {
+            return Roles.Find(r => true).ToListAsync();
+        }
+
+        public void Dispose()
+        {
         }
     }
 }
